@@ -31,7 +31,6 @@ The immersive route uses procedural architectural geometry; no third-party GLB/G
 - React Three Fiber — MIT License
 - Drei — MIT License
 - Lenis — MIT License
-- GSAP — GreenSock standard no-charge license (included as an interaction dependency; no Club plugins)
 - Lucide — ISC License
 
 See each package's license in `node_modules` or its upstream repository for the complete terms.

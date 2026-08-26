@@ -15,7 +15,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes("three") || id.includes("@react-three")) return "three";
-          if (id.includes("gsap") || id.includes("lenis")) return "motion";
+          if (id.includes("lenis")) return "motion";
         },
       },
     },

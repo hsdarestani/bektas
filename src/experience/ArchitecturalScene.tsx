@@ -8,8 +8,6 @@ type Props = {
   progress: MutableRefObject<number>;
   mobile: boolean;
   visible: boolean;
-  recoveryEpoch: number;
-  onRendererCreated: () => void;
   onReady: () => void;
   onContextLost: () => void;
   onContextRestored: () => void;
@@ -189,19 +187,31 @@ function RenderResumer({ visible }: Pick<Props, "visible">) {
   return null;
 }
 
-function FirstRenderedFrame({ recoveryEpoch, onReady }: Pick<Props, "recoveryEpoch" | "onReady">) {
+function WebGLContextEvents({ onContextLost, onContextRestored }: Pick<Props, "onContextLost" | "onContextRestored">) {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handleLost = (event: Event) => {
+      event.preventDefault();
+      onContextLost();
+    };
+    canvas.addEventListener("webglcontextlost", handleLost, false);
+    canvas.addEventListener("webglcontextrestored", onContextRestored, false);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", handleLost, false);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored, false);
+    };
+  }, [gl, onContextLost, onContextRestored]);
+  return null;
+}
+
+function FirstRenderedFrame({ onReady }: Pick<Props, "onReady">) {
   const gl = useThree((state) => state.gl);
   const initialFrame = useRef(gl.info.render.frame);
   const reported = useRef(false);
   const scheduled = useRef(false);
   const raf = useRef(0);
 
-  useEffect(() => {
-    initialFrame.current = gl.info.render.frame;
-    reported.current = false;
-    scheduled.current = false;
-    cancelAnimationFrame(raf.current);
-  }, [gl, recoveryEpoch]);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   useFrame(() => {
     if (reported.current || scheduled.current) return;
@@ -255,7 +265,8 @@ function Scene(props: Props) {
     {contactReady && <ContactShadows position={[0, -0.48, 0]} opacity={0.42} scale={40} blur={2.6} far={18} resolution={props.mobile ? 512 : 1024} frames={1} />}
     <CinematicCamera progress={props.progress} mobile={props.mobile} />
     <RenderResumer visible={props.visible} />
-    <FirstRenderedFrame recoveryEpoch={props.recoveryEpoch} onReady={handleFirstFrame} />
+    <WebGLContextEvents onContextLost={props.onContextLost} onContextRestored={props.onContextRestored} />
+    <FirstRenderedFrame onReady={handleFirstFrame} />
     <fog attach="fog" args={["#aeb0a3", 30, 72]} />
     {!props.mobile && <EffectComposer multisampling={4}><Bloom mipmapBlur intensity={0.22} luminanceThreshold={1.18} luminanceSmoothing={0.28} /><Vignette eskil={false} offset={0.22} darkness={0.34} /></EffectComposer>}
   </>;
@@ -274,13 +285,6 @@ export default function ArchitecturalScene(props: Props) {
     onCreated={({ gl }) => {
       gl.outputColorSpace = THREE.SRGBColorSpace;
       gl.shadowMap.type = THREE.PCFSoftShadowMap;
-      if (gl.getContext().isContextLost()) throw new Error("WebGL context unavailable during renderer initialization");
-      gl.domElement.addEventListener("webglcontextlost", (event) => {
-        event.preventDefault();
-        props.onContextLost();
-      }, false);
-      gl.domElement.addEventListener("webglcontextrestored", props.onContextRestored, false);
-      props.onRendererCreated();
     }}
   ><Scene {...props} /></Canvas>;
 }

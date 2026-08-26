@@ -2,7 +2,6 @@ import { Component, ErrorInfo, ReactNode } from "react";
 
 type Props = {
   children: ReactNode;
-  resetKey: number;
   onError: (error: Error, info: ErrorInfo) => void;
 };
 
@@ -17,12 +16,6 @@ export default class ExperienceErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     this.props.onError(error, info);
-  }
-
-  componentDidUpdate(previous: Props) {
-    if (previous.resetKey !== this.props.resetKey && this.state.error) {
-      this.setState({ error: null });
-    }
   }
 
   render() {

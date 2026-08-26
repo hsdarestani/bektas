@@ -12,10 +12,13 @@ test("waits for a rendered WebGL frame before marking the experience ready", () 
   assert.match(page, /Math\.min\(99,/);
 });
 
-test("handles renderer initialization and WebGL context failure", () => {
+test("handles WebGL context events without automatic Canvas remounts", () => {
   assert.match(scene, /webglcontextlost/);
   assert.match(scene, /webglcontextrestored/);
-  assert.match(page, /WebGL renderer initialization timed out/);
+  assert.match(scene, /removeEventListener\("webglcontextlost"/);
+  assert.match(scene, /removeEventListener\("webglcontextrestored"/);
+  assert.doesNotMatch(page, /sceneAttempt|recoveryEpoch|renderer initialization timed out/);
+  assert.doesNotMatch(scene, /key=\{sceneAttempt\}/);
   assert.match(page, /ExperienceErrorBoundary/);
   assert.match(page, /experience-static-fallback/);
 });

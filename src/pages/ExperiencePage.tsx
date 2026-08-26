@@ -1,11 +1,11 @@
-import { ArrowDown, ArrowLeft, ArrowUpRight, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { useProgress } from "@react-three/drei";
 import { CSSProperties, lazy, MutableRefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Lenis from "lenis";
 import ExperienceErrorBoundary from "../experience/ExperienceErrorBoundary";
 
 const ArchitecturalScene = lazy(() => import("../experience/ArchitecturalScene"));
-type RenderState = "loading" | "ready" | "recovering" | "failed";
+type RenderState = "loading" | "ready" | "failed";
 
 const chapters = [
   { number: "01", kicker: "Eine neue Perspektive", title: <>Immobilien<br /><em>neu erleben.</em></>, body: "Architektur ist mehr als Fläche. Sie ist Licht, Material, Lage und das Gefühl, angekommen zu sein." },
@@ -29,28 +29,22 @@ function useMediaQuery(query: string) {
 
 function PremiumLoader({ state, onAssetError }: { state: RenderState; onAssetError: (error: Error) => void }) {
   const { progress, errors } = useProgress();
-  const value = state === "ready" ? 100 : state === "recovering" ? 86 : Math.min(99, Math.max(3, Math.round(progress)));
+  const value = state === "ready" ? 100 : Math.min(99, Math.max(3, Math.round(progress)));
   useEffect(() => {
     if (errors.length) onAssetError(new Error(`3D asset loading failed: ${errors.join(", ")}`));
   }, [errors, onAssetError]);
-  return <div className="experience-loader" aria-live="polite"><div><strong>BEKTAS</strong><span>{state === "recovering" ? "GRAFIK WIRD WIEDERHERGESTELLT" : "IMMOBILIEN · WIESBADEN"}</span><div className="loader-track" style={{ "--load-progress": `${value}%` } as CSSProperties}><i /></div><small>{String(value).padStart(2, "0")} / 100</small></div></div>;
+  return <div className="experience-loader" aria-live="polite"><div><strong>BEKTAS</strong><span>IMMOBILIEN · WIESBADEN</span><div className="loader-track" style={{ "--load-progress": `${value}%` } as CSSProperties}><i /></div><small>{String(value).padStart(2, "0")} / 100</small></div></div>;
 }
 
 export default function ExperiencePage() {
   const progress = useRef(0) as MutableRefObject<number>;
   const recoveryTimer = useRef(0);
-  const retryTimer = useRef(0);
-  const rendererInitTimer = useRef(0);
-  const rendererCreatedAttempt = useRef(-1);
-  const automaticRetries = useRef(0);
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(() => !document.hidden);
   const mobile = useMediaQuery("(max-width: 700px)");
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const webglAvailable = useMemo(() => typeof window.WebGL2RenderingContext !== "undefined", []);
   const [renderState, setRenderState] = useState<RenderState>(() => webglAvailable ? "loading" : "failed");
-  const [sceneAttempt, setSceneAttempt] = useState(0);
-  const [recoveryEpoch, setRecoveryEpoch] = useState(0);
   const [failureReason, setFailureReason] = useState<string | null>(() => webglAvailable ? null : "WebGL 2 ist in diesem Browser nicht verfügbar.");
   const staticFallback = renderState === "failed";
   const loaded = renderState === "ready" || renderState === "failed";
@@ -66,62 +60,27 @@ export default function ExperiencePage() {
     setFailureReason(null);
   }, [clearRecoveryTimer]);
 
-  const handleRendererCreated = useCallback(() => {
-    rendererCreatedAttempt.current = sceneAttempt;
-    clearTimeout(rendererInitTimer.current);
-  }, [sceneAttempt]);
-
   const handleContextLost = useCallback(() => {
     clearRecoveryTimer();
-    setRenderState("recovering");
+    console.warn("Bektas immersive renderer: WebGL context lost; waiting for browser restoration");
     recoveryTimer.current = window.setTimeout(() => {
+      console.error("Bektas immersive renderer: WebGL context was not restored within 15 seconds");
       setFailureReason("Die 3D-Darstellung konnte nicht automatisch wiederhergestellt werden.");
       setRenderState("failed");
-    }, 8000);
+    }, 15000);
   }, [clearRecoveryTimer]);
 
   const handleContextRestored = useCallback(() => {
     clearRecoveryTimer();
-    setRenderState("loading");
-    setRecoveryEpoch((value) => value + 1);
+    console.info("Bektas immersive renderer: WebGL context restored");
   }, [clearRecoveryTimer]);
 
-  const handleRendererError = useCallback((error: Error) => {
-    console.error("Bektas immersive renderer recovered from an error", error);
+  const handleRendererError = useCallback((error: Error, info?: { componentStack?: string | null }) => {
+    console.error("Bektas immersive renderer unrecoverable error", error, info?.componentStack ?? "");
     clearRecoveryTimer();
-    clearTimeout(retryTimer.current);
-    if (webglAvailable && automaticRetries.current < 1) {
-      automaticRetries.current += 1;
-      setRenderState("recovering");
-      retryTimer.current = window.setTimeout(() => {
-        setSceneAttempt((value) => value + 1);
-        setRecoveryEpoch((value) => value + 1);
-        setRenderState("loading");
-      }, 700);
-      return;
-    }
     setFailureReason("Die 3D-Darstellung wurde sicher beendet. Die Inhalte bleiben vollständig verfügbar.");
     setRenderState("failed");
-  }, [clearRecoveryTimer, webglAvailable]);
-
-  const retryRenderer = useCallback(() => {
-    automaticRetries.current = 0;
-    setFailureReason(null);
-    setSceneAttempt((value) => value + 1);
-    setRecoveryEpoch((value) => value + 1);
-    setRenderState("loading");
-  }, []);
-
-  useEffect(() => {
-    if (renderState !== "loading" || !webglAvailable || rendererCreatedAttempt.current === sceneAttempt) return;
-    clearTimeout(rendererInitTimer.current);
-    rendererInitTimer.current = window.setTimeout(() => {
-      if (rendererCreatedAttempt.current !== sceneAttempt) {
-        handleRendererError(new Error("WebGL renderer initialization timed out"));
-      }
-    }, 4000);
-    return () => clearTimeout(rendererInitTimer.current);
-  }, [handleRendererError, renderState, sceneAttempt, webglAvailable]);
+  }, [clearRecoveryTimer]);
 
   useEffect(() => {
     document.title = "3D Experience — Bektas Immobilien Wiesbaden";
@@ -156,8 +115,6 @@ export default function ExperiencePage() {
       cancelAnimationFrame(rafId);
       cancelAnimationFrame(resizeRaf);
       clearTimeout(recoveryTimer.current);
-      clearTimeout(retryTimer.current);
-      clearTimeout(rendererInitTimer.current);
       lenis.destroy();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("orientationchange", onViewportResize);
@@ -167,15 +124,15 @@ export default function ExperiencePage() {
     };
   }, [reduced]);
 
-  return <div className={`immersive ${loaded ? "is-loaded" : ""} ${reduced ? "is-reduced" : ""} ${staticFallback ? "is-fallback" : ""} ${renderState === "recovering" ? "is-recovering" : ""}`}>
+  return <div className={`immersive ${loaded ? "is-loaded" : ""} ${reduced ? "is-reduced" : ""} ${staticFallback ? "is-fallback" : ""}`}>
     <div className="experience-bg" />
-    {staticFallback ? <div className="experience-static-fallback" role="img" aria-label="Zeitgenössische Residenz in einer natürlichen Landschaft" /> : <ExperienceErrorBoundary resetKey={sceneAttempt} onError={handleRendererError}><Suspense fallback={null}><ArchitecturalScene key={sceneAttempt} progress={progress} mobile={mobile} visible={visible} recoveryEpoch={recoveryEpoch} onRendererCreated={handleRendererCreated} onReady={handleSceneReady} onContextLost={handleContextLost} onContextRestored={handleContextRestored} /></Suspense></ExperienceErrorBoundary>}
+    {staticFallback ? <div className="experience-static-fallback" role="img" aria-label="Zeitgenössische Residenz in einer natürlichen Landschaft" /> : <ExperienceErrorBoundary onError={handleRendererError}><Suspense fallback={null}><ArchitecturalScene progress={progress} mobile={mobile} visible={visible} onReady={handleSceneReady} onContextLost={handleContextLost} onContextRestored={handleContextRestored} /></Suspense></ExperienceErrorBoundary>}
     <div className="experience-noise" />
     <header className="experience-header"><a href="/" className="exp-logo"><strong>BEKTAS</strong><span>IMMOBILIEN</span></a><div className="exp-mode"><i /> Interactive Experience</div><a href="/" className="exp-back"><ArrowLeft /> Klassische Website</a></header>
     <aside className="chapter-nav" aria-label="Kapitel">{chapters.map((_, i) => <a key={i} href={`#chapter-${i + 1}`} className={active === i ? "active" : ""}><span>0{i + 1}</span><i /></a>)}</aside>
     <div className="experience-progress"><span /></div>
     <div className="experience-scroll"><ArrowDown /><span>Scroll to explore</span></div>
-    {staticFallback && failureReason && <div className="experience-recovery-note" role="status"><span>Architekturansicht gesichert</span><p>{failureReason}</p>{webglAvailable && <button type="button" onClick={retryRenderer}><RotateCcw /> 3D erneut starten</button>}</div>}
+    {staticFallback && failureReason && <div className="experience-recovery-note" role="status"><span>Architekturansicht gesichert</span><p>{failureReason}</p></div>}
     <main className="experience-story">
       {chapters.map((chapter, i) => <section id={`chapter-${i + 1}`} className={`experience-chapter chapter-${i + 1} ${active === i ? "is-active" : ""}`} key={chapter.number}><div className="chapter-copy"><p><span>{chapter.number}</span>{chapter.kicker}</p><h1>{chapter.title}</h1><div className="chapter-body"><i /><p>{chapter.body}</p></div>{i === 3 && <a href="/#bewertung">Bewertung starten <ArrowUpRight /></a>}</div></section>)}
       <section className="experience-finale"><div className="finale-image"><img src="/images/hero-residence.webp" alt="Zeitgenössische Immobilie bei Nacht" /></div><div className="finale-copy"><span>Ihre nächste Entscheidung</span><h2>Beginnt mit einem<br /><em>persönlichen Gespräch.</em></h2><div><a href="tel:+491777170385">+49 177 717 03 85</a><a href="mailto:info@bektas-immobilien-wiesbaden.de">Kontakt aufnehmen <ArrowUpRight /></a></div><a className="experience-credits" href="/experience/credits.txt" target="_blank" rel="noreferrer">3D Assets &amp; Credits</a></div></section>

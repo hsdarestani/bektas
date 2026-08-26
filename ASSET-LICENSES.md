@@ -23,14 +23,42 @@ These assets remain the property of their original rights holder. Confirm the cl
 
 Both font families are self-hosted in `public/fonts` to avoid runtime font requests.
 
-## 3D and interaction
+## Immersive 3D architecture
 
-The immersive route uses procedural architectural geometry; no third-party GLB/GLTF model or remote HDRI is included.
+- **Modern luxury villa house building with pool** by **saeedakbari** —
+  [Sketchfab source](https://sketchfab.com/3d-models/modern-luxury-villa-house-building-with-pool-1e36279ffc4e43c997c627cfa41752f0),
+  licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+  `public/experience/models/villa.glb` is an optimized derivative of that model.
+- Downloadable source mirror used for the original glTF package:
+  [DylPorter/aisl-vr at caf4d84](https://github.com/DylPorter/aisl-vr/tree/caf4d84f4f39558582af0df7d6dd8de3b1f40353/modern_luxury_villa_house_building_with_pool).
+  The embedded model metadata and bundled `license.txt` identify the same Sketchfab author, model URL and CC BY 4.0 license.
+
+## HDR environment, vegetation and PBR surfaces
+
+The following assets are by [Poly Haven](https://polyhaven.com/) and are licensed
+under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/):
+
+- [Eilenriede Park HDRI](https://polyhaven.com/a/eilenriede_park) — self-hosted 1K and 2K HDR variants.
+- [Quiver Tree 01](https://polyhaven.com/a/quiver_tree_01) — optimized glTF.
+- [Shrub 02](https://polyhaven.com/a/shrub_02) — optimized glTF.
+- [Fern 02](https://polyhaven.com/a/fern_02) — optimized glTF.
+- [Aerial Grass Rock](https://polyhaven.com/a/aerial_grass_rock) — 1K base color, OpenGL normal, roughness and displacement maps.
+- [Concrete Pavement 02](https://polyhaven.com/a/concrete_pavement_02) — 1K base color, OpenGL normal, roughness and displacement maps.
+- [Concrete Wall 009](https://polyhaven.com/a/concrete_wall_009) — 1K OpenGL normal and roughness maps.
+
+All runtime assets are self-hosted. Models were web-optimized with glTF Transform,
+Meshopt geometry compression and WebP texture conversion. The original author credit
+and licensing summary are also served at `/experience/credits.txt`.
+
+## 3D and interaction libraries
 
 - Three.js — MIT License
 - React Three Fiber — MIT License
 - Drei — MIT License
+- React Three Postprocessing — MIT License
+- postprocessing — Zlib License
 - Lenis — MIT License
 - Lucide — ISC License
+- glTF Transform (development tooling) — MIT License
 
 See each package's license in `node_modules` or its upstream repository for the complete terms.

@@ -1,0 +1,16 @@
+BEKTAS IMMOBILIEN WIESBADEN — 3D ASSET CREDITS
+
+Modern luxury villa house building with pool
+Creator: saeedakbari
+Source: https://sketchfab.com/3d-models/modern-luxury-villa-house-building-with-pool-1e36279ffc4e43c997c627cfa41752f0
+License: Creative Commons Attribution 4.0 (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+The production GLB is an optimized derivative of the original model.
+
+Eilenriede Park HDRI, Quiver Tree 01, Shrub 02, Fern 02,
+Aerial Grass Rock, Concrete Pavement 02 and Concrete Wall 009
+Creator/source: Poly Haven — https://polyhaven.com/
+License: CC0 1.0 — https://creativecommons.org/publicdomain/zero/1.0/
+
+Full source links and processing notes:
+https://github.com/hsdarestani/bektas/blob/main/ASSET-LICENSES.md

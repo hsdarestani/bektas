@@ -50,6 +50,10 @@ All runtime assets are self-hosted. Models were web-optimized with glTF Transfor
 Meshopt geometry compression and WebP texture conversion. The original author credit
 and licensing summary are also served at `/experience/credits.txt`.
 
+The `*-mobile.glb` and `*-mobile.jpg` files are perceptually matched derivatives of
+the same licensed sources. They retain the full villa geometry, architectural materials,
+environment and landscaping while reducing decoded GPU texture allocation on mobile.
+
 ## 3D and interaction libraries
 
 - Three.js — MIT License

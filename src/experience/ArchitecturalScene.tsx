@@ -1,73 +1,80 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { AdaptiveDpr, ContactShadows, Environment, PerformanceMonitor, useGLTF, useTexture } from "@react-three/drei";
+import { ContactShadows, Environment, PerformanceMonitor, useGLTF, useTexture } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
-import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { MutableRefObject, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 type Props = {
   progress: MutableRefObject<number>;
   mobile: boolean;
-  weak: boolean;
+  visible: boolean;
+  recoveryEpoch: number;
+  onRendererCreated: () => void;
   onReady: () => void;
+  onContextLost: () => void;
+  onContextRestored: () => void;
 };
 
+type Placement = [number, number, number, number, number];
 const MODEL_ROOT = "/experience/models/";
 
-function configureTexture(texture: THREE.Texture, repeat: [number, number], color = false) {
+function configureTexture(texture: THREE.Texture, repeat: [number, number], color: boolean, mobile: boolean) {
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(...repeat);
-  texture.anisotropy = 8;
+  texture.anisotropy = mobile ? 4 : 8;
   if (color) texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
 }
 
-function PbrLandscape() {
+function PbrLandscape({ mobile }: { mobile: boolean }) {
+  const suffix = mobile ? "-mobile" : "";
   const ground = useTexture({
-    map: "/experience/textures/aerial_grass_rock_Diffuse.jpg",
-    normalMap: "/experience/textures/aerial_grass_rock_nor_gl.jpg",
-    roughnessMap: "/experience/textures/aerial_grass_rock_Rough.jpg",
-    displacementMap: "/experience/textures/aerial_grass_rock_Displacement.jpg",
+    map: `/experience/textures/aerial_grass_rock_Diffuse${suffix}.jpg`,
+    normalMap: `/experience/textures/aerial_grass_rock_nor_gl${suffix}.jpg`,
+    roughnessMap: `/experience/textures/aerial_grass_rock_Rough${suffix}.jpg`,
+    displacementMap: `/experience/textures/aerial_grass_rock_Displacement${suffix}.jpg`,
   });
   const paving = useTexture({
-    map: "/experience/textures/concrete_pavement_02_Diffuse.jpg",
-    normalMap: "/experience/textures/concrete_pavement_02_nor_gl.jpg",
-    roughnessMap: "/experience/textures/concrete_pavement_02_Rough.jpg",
-    displacementMap: "/experience/textures/concrete_pavement_02_Displacement.jpg",
+    map: `/experience/textures/concrete_pavement_02_Diffuse${suffix}.jpg`,
+    normalMap: `/experience/textures/concrete_pavement_02_nor_gl${suffix}.jpg`,
+    roughnessMap: `/experience/textures/concrete_pavement_02_Rough${suffix}.jpg`,
+    displacementMap: `/experience/textures/concrete_pavement_02_Displacement${suffix}.jpg`,
   });
+  const groundNormalScale = useMemo(() => new THREE.Vector2(0.8, 0.8), []);
+  const pavingNormalScale = useMemo(() => new THREE.Vector2(0.7, 0.7), []);
 
   useLayoutEffect(() => {
-    Object.entries(ground).forEach(([key, texture]) => configureTexture(texture, [7, 7], key === "map"));
-    Object.entries(paving).forEach(([key, texture]) => configureTexture(texture, [4, 2], key === "map"));
-  }, [ground, paving]);
+    Object.entries(ground).forEach(([key, texture]) => configureTexture(texture, [7, 7], key === "map", mobile));
+    Object.entries(paving).forEach(([key, texture]) => configureTexture(texture, [4, 2], key === "map", mobile));
+  }, [ground, mobile, paving]);
 
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.82, 0]} receiveShadow>
-        <planeGeometry args={[78, 78, 96, 96]} />
-        <meshStandardMaterial {...ground} color="#66705a" roughness={0.94} displacementScale={0.72} displacementBias={-0.16} normalScale={new THREE.Vector2(0.8, 0.8)} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0.045]} position={[-0.8, -0.28, 12.6]} receiveShadow>
-        <planeGeometry args={[28, 13, 44, 18]} />
-        <meshStandardMaterial {...paving} color="#b4ada0" roughness={0.88} displacementScale={0.12} normalScale={new THREE.Vector2(0.7, 0.7)} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-13.5, -0.44, -9]} receiveShadow>
-        <circleGeometry args={[11, 72]} />
-        <meshStandardMaterial {...ground} color="#4d5945" roughness={1} normalScale={new THREE.Vector2(0.9, 0.9)} />
-      </mesh>
-    </group>
-  );
+  return <group>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.82, 0]} receiveShadow>
+      <planeGeometry args={[78, 78, mobile ? 72 : 96, mobile ? 72 : 96]} />
+      <meshStandardMaterial {...ground} color="#66705a" roughness={0.94} displacementScale={0.72} displacementBias={-0.16} normalScale={groundNormalScale} />
+    </mesh>
+    <mesh rotation={[-Math.PI / 2, 0, 0.045]} position={[-0.8, -0.28, 12.6]} receiveShadow>
+      <planeGeometry args={[28, 13, mobile ? 36 : 44, mobile ? 14 : 18]} />
+      <meshStandardMaterial {...paving} color="#b4ada0" roughness={0.88} displacementScale={0.12} normalScale={pavingNormalScale} />
+    </mesh>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-13.5, -0.44, -9]} receiveShadow>
+      <circleGeometry args={[11, mobile ? 56 : 72]} />
+      <meshStandardMaterial {...ground} color="#4d5945" roughness={1} normalScale={groundNormalScale} />
+    </mesh>
+  </group>;
 }
 
-function Villa() {
-  const { scene } = useGLTF(`${MODEL_ROOT}villa.glb`);
+function Villa({ mobile }: { mobile: boolean }) {
+  const { scene } = useGLTF(`${MODEL_ROOT}${mobile ? "villa-mobile.glb" : "villa.glb"}`);
+  const suffix = mobile ? "-mobile" : "";
   const concrete = useTexture({
-    normalMap: "/experience/textures/concrete_wall_009_nor_gl.jpg",
-    roughnessMap: "/experience/textures/concrete_wall_009_Rough.jpg",
+    normalMap: `/experience/textures/concrete_wall_009_nor_gl${suffix}.jpg`,
+    roughnessMap: `/experience/textures/concrete_wall_009_Rough${suffix}.jpg`,
   });
   const model = useMemo(() => scene.clone(true), [scene]);
 
   useLayoutEffect(() => {
-    Object.values(concrete).forEach((texture) => configureTexture(texture, [3.2, 3.2]));
+    Object.values(concrete).forEach((texture) => configureTexture(texture, [3.2, 3.2], false, mobile));
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.castShadow = true;
@@ -100,26 +107,45 @@ function Villa() {
       }
       object.material = material;
     });
-  }, [concrete, model]);
 
-  return <primitive object={model} scale={0.46} position={[1.35, 0, -0.7]} rotation={[0, -0.16, 0]} />;
+    return () => {
+      model.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => material.dispose());
+      });
+    };
+  }, [concrete, mobile, model]);
+
+  return <primitive object={model} dispose={null} scale={0.46} position={[1.35, 0, -0.7]} rotation={[0, -0.16, 0]} />;
 }
 
-function Landscaping({ mobile, weak }: { mobile: boolean; weak: boolean }) {
-  const tree = useGLTF(`${MODEL_ROOT}quiver-tree.glb`).scene;
-  const shrub = useGLTF(`${MODEL_ROOT}shrub.glb`).scene;
-  const fern = useGLTF(`${MODEL_ROOT}fern.glb`).scene;
-  const treePlacements = mobile ? [[-8.8, -0.45, -10.5, 3.1, 0.3]] : [[-10.8, -0.45, -10.5, 3.45, 0.3], [12.5, -0.52, -12.2, 2.95, -0.9], [-15.8, -0.55, 5.5, 2.5, 1.2]];
-  const shrubs = weak ? [[-7.8, -0.35, 8.5, 2.2, 0]] : [[-8.6, -0.35, 8.2, 2.45, 0.15], [9.6, -0.4, 8.8, 2.15, -0.6], [-10.5, -0.45, -4.8, 2.7, 0.6], [12.2, -0.45, -4.5, 2.3, -0.2], [-5.5, -0.35, 12.2, 1.8, 1.1], [7.4, -0.38, 12.6, 1.9, -1]];
-  const ferns = mobile ? [[-5.5, -0.45, 9.2, 2.2, 0.4]] : [[-6.2, -0.45, 10.4, 2.6, 0.4], [-3.4, -0.42, 12.2, 2, -0.8], [7.8, -0.45, 10.1, 2.3, 1.3], [10.2, -0.5, 6.5, 2.8, -0.2]];
+function cloneAt(scene: THREE.Group, placement: Placement) {
+  const [x, y, z, scale, rotation] = placement;
+  const object = scene.clone(true);
+  object.position.set(x, y, z);
+  object.scale.setScalar(scale);
+  object.rotation.set(0, rotation, 0);
+  return object;
+}
 
-  return (
-    <group>
-      {treePlacements.map(([x, y, z, scale, rotation], index) => <primitive key={`tree-${index}`} object={tree.clone(true)} position={[x, y, z]} scale={scale} rotation={[0, rotation, 0]} />)}
-      {shrubs.map(([x, y, z, scale, rotation], index) => <primitive key={`shrub-${index}`} object={shrub.clone(true)} position={[x, y, z]} scale={scale} rotation={[0, rotation, 0]} />)}
-      {ferns.map(([x, y, z, scale, rotation], index) => <primitive key={`fern-${index}`} object={fern.clone(true)} position={[x, y, z]} scale={scale} rotation={[0, rotation, 0]} />)}
-    </group>
-  );
+function Landscaping({ mobile }: { mobile: boolean }) {
+  const suffix = mobile ? "-mobile" : "";
+  const tree = useGLTF(`${MODEL_ROOT}quiver-tree${suffix}.glb`).scene;
+  const shrub = useGLTF(`${MODEL_ROOT}shrub${suffix}.glb`).scene;
+  const fern = useGLTF(`${MODEL_ROOT}fern${suffix}.glb`).scene;
+  const treePlacements = useMemo<Placement[]>(() => mobile ? [[-8.8, -0.45, -10.5, 3.1, 0.3]] : [[-10.8, -0.45, -10.5, 3.45, 0.3], [12.5, -0.52, -12.2, 2.95, -0.9], [-15.8, -0.55, 5.5, 2.5, 1.2]], [mobile]);
+  const shrubPlacements = useMemo<Placement[]>(() => [[-8.6, -0.35, 8.2, 2.45, 0.15], [9.6, -0.4, 8.8, 2.15, -0.6], [-10.5, -0.45, -4.8, 2.7, 0.6], [12.2, -0.45, -4.5, 2.3, -0.2], [-5.5, -0.35, 12.2, 1.8, 1.1], [7.4, -0.38, 12.6, 1.9, -1]], []);
+  const fernPlacements = useMemo<Placement[]>(() => mobile ? [[-5.5, -0.45, 9.2, 2.2, 0.4]] : [[-6.2, -0.45, 10.4, 2.6, 0.4], [-3.4, -0.42, 12.2, 2, -0.8], [7.8, -0.45, 10.1, 2.3, 1.3], [10.2, -0.5, 6.5, 2.8, -0.2]], [mobile]);
+  const trees = useMemo(() => treePlacements.map((placement) => cloneAt(tree, placement)), [tree, treePlacements]);
+  const shrubs = useMemo(() => shrubPlacements.map((placement) => cloneAt(shrub, placement)), [shrub, shrubPlacements]);
+  const ferns = useMemo(() => fernPlacements.map((placement) => cloneAt(fern, placement)), [fern, fernPlacements]);
+
+  return <group dispose={null}>
+    {trees.map((object, index) => <primitive key={`tree-${index}`} object={object} dispose={null} />)}
+    {shrubs.map((object, index) => <primitive key={`shrub-${index}`} object={object} dispose={null} />)}
+    {ferns.map((object, index) => <primitive key={`fern-${index}`} object={object} dispose={null} />)}
+  </group>;
 }
 
 function CinematicCamera({ progress, mobile }: Pick<Props, "progress" | "mobile">) {
@@ -157,47 +183,104 @@ function CinematicCamera({ progress, mobile }: Pick<Props, "progress" | "mobile"
   return null;
 }
 
-function Scene({ progress, mobile, weak, onReady }: Props) {
-  const [quality, setQuality] = useState(1);
-  useEffect(() => onReady(), [onReady]);
+function RenderResumer({ visible }: Pick<Props, "visible">) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => { if (visible) invalidate(); }, [invalidate, visible]);
+  return null;
+}
 
-  return (
-    <>
-      <PerformanceMonitor factor={1} flipflops={2} onDecline={() => setQuality(0.72)} onIncline={() => setQuality(1)} />
-      <AdaptiveDpr pixelated />
-      <Environment files={mobile ? "/experience/environment/eilenriede_park_1k.hdr" : "/experience/environment/eilenriede_park_2k.hdr"} background backgroundBlurriness={0.18} environmentIntensity={1.08} backgroundIntensity={0.82} environmentRotation={[0, 1.08, 0]} backgroundRotation={[0, 1.08, 0]} />
-      <hemisphereLight args={["#dce3df", "#3f4535", 1.25]} />
-      <directionalLight position={[18, 25, 13]} color="#ffdec0" intensity={3.25} castShadow={!weak} shadow-mapSize={mobile || quality < 1 ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-24} shadow-camera-right={24} shadow-camera-top={24} shadow-camera-bottom={-24} shadow-bias={-0.00018} />
-      <pointLight position={[-3.6, 2.15, 3.8]} color="#ffc784" intensity={44} distance={10} decay={2.2} />
-      <pointLight position={[5.4, 2.8, -1.8]} color="#ffd7a3" intensity={36} distance={9} decay={2.2} />
-      <PbrLandscape />
-      <Villa />
-      <Landscaping mobile={mobile} weak={weak} />
-      {!weak && <ContactShadows position={[0, -0.48, 0]} opacity={0.42} scale={40} blur={2.6} far={18} resolution={mobile ? 512 : 1024} frames={1} />}
-      <CinematicCamera progress={progress} mobile={mobile} />
-      <fog attach="fog" args={["#aeb0a3", 30, 72]} />
-      {!mobile && !weak && quality > 0.8 && <EffectComposer multisampling={4}><Bloom mipmapBlur intensity={0.22} luminanceThreshold={1.18} luminanceSmoothing={0.28} /><Vignette eskil={false} offset={0.22} darkness={0.34} /></EffectComposer>}
-    </>
-  );
+function FirstRenderedFrame({ recoveryEpoch, onReady }: Pick<Props, "recoveryEpoch" | "onReady">) {
+  const gl = useThree((state) => state.gl);
+  const initialFrame = useRef(gl.info.render.frame);
+  const reported = useRef(false);
+  const scheduled = useRef(false);
+  const raf = useRef(0);
+
+  useEffect(() => {
+    initialFrame.current = gl.info.render.frame;
+    reported.current = false;
+    scheduled.current = false;
+    cancelAnimationFrame(raf.current);
+  }, [gl, recoveryEpoch]);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  useFrame(() => {
+    if (reported.current || scheduled.current) return;
+    scheduled.current = true;
+    raf.current = requestAnimationFrame(() => {
+      scheduled.current = false;
+      const context = gl.getContext();
+      if (!context.isContextLost() && gl.info.render.frame > initialFrame.current && gl.info.render.calls > 0) {
+        reported.current = true;
+        onReady();
+      }
+    });
+  });
+  return null;
+}
+
+function RuntimeDpr({ mobile, balanced }: { mobile: boolean; balanced: boolean }) {
+  const setDpr = useThree((state) => state.setDpr);
+  useEffect(() => {
+    const nativeDpr = window.devicePixelRatio || 1;
+    setDpr(mobile ? Math.min(nativeDpr, balanced ? 1.1 : 1.35) : Math.min(nativeDpr, balanced ? 1.5 : 2));
+  }, [balanced, mobile, setDpr]);
+  return null;
+}
+
+function Scene(props: Props) {
+  const [balanced, setBalanced] = useState(false);
+  const [landscapingReady, setLandscapingReady] = useState(!props.mobile);
+  const [contactReady, setContactReady] = useState(!props.mobile);
+  const timers = useRef<number[]>([]);
+  const handleFirstFrame = useCallback(() => {
+    props.onReady();
+    if (props.mobile && !landscapingReady) {
+      timers.current.push(window.setTimeout(() => setLandscapingReady(true), 120));
+      timers.current.push(window.setTimeout(() => setContactReady(true), 520));
+    }
+  }, [landscapingReady, props.mobile, props.onReady]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  return <>
+    <PerformanceMonitor flipflops={1} onDecline={() => setBalanced(true)} />
+    <RuntimeDpr mobile={props.mobile} balanced={balanced} />
+    <Environment files={props.mobile ? "/experience/environment/eilenriede_park_1k.hdr" : "/experience/environment/eilenriede_park_2k.hdr"} background backgroundBlurriness={0.18} environmentIntensity={1.08} backgroundIntensity={0.82} environmentRotation={[0, 1.08, 0]} backgroundRotation={[0, 1.08, 0]} />
+    <hemisphereLight args={["#dce3df", "#3f4535", 1.25]} />
+    <directionalLight position={[18, 25, 13]} color="#ffdec0" intensity={3.25} castShadow shadow-mapSize={props.mobile || balanced ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-24} shadow-camera-right={24} shadow-camera-top={24} shadow-camera-bottom={-24} shadow-bias={-0.00018} />
+    <pointLight position={[-3.6, 2.15, 3.8]} color="#ffc784" intensity={44} distance={10} decay={2.2} />
+    <pointLight position={[5.4, 2.8, -1.8]} color="#ffd7a3" intensity={36} distance={9} decay={2.2} />
+    <PbrLandscape mobile={props.mobile} />
+    <Villa mobile={props.mobile} />
+    {landscapingReady && <Suspense fallback={null}><Landscaping mobile={props.mobile} /></Suspense>}
+    {contactReady && <ContactShadows position={[0, -0.48, 0]} opacity={0.42} scale={40} blur={2.6} far={18} resolution={props.mobile ? 512 : 1024} frames={1} />}
+    <CinematicCamera progress={props.progress} mobile={props.mobile} />
+    <RenderResumer visible={props.visible} />
+    <FirstRenderedFrame recoveryEpoch={props.recoveryEpoch} onReady={handleFirstFrame} />
+    <fog attach="fog" args={["#aeb0a3", 30, 72]} />
+    {!props.mobile && <EffectComposer multisampling={4}><Bloom mipmapBlur intensity={0.22} luminanceThreshold={1.18} luminanceSmoothing={0.28} /><Vignette eskil={false} offset={0.22} darkness={0.34} /></EffectComposer>}
+  </>;
 }
 
 export default function ArchitecturalScene(props: Props) {
-  return (
-    <Canvas
-      className="experience-canvas"
-      dpr={props.mobile || props.weak ? [0.9, 1.3] : [1.25, 2]}
-      gl={{ antialias: true, powerPreference: "high-performance", alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-      camera={{ position: [22, 7.8, 28], fov: props.mobile ? 50 : 39, near: 0.1, far: 120 }}
-      shadows={!props.weak ? "soft" : false}
-      fallback={<div className="webgl-fallback" role="img" aria-label="Zeitgenössische Residenz in natürlicher Umgebung" />}
-      onCreated={({ gl }) => { gl.outputColorSpace = THREE.SRGBColorSpace; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}
-    >
-      <Scene {...props} />
-    </Canvas>
-  );
+  return <Canvas
+    className="experience-canvas"
+    dpr={props.mobile ? [1, 1.35] : [1.25, 2]}
+    frameloop={props.visible ? "always" : "never"}
+    resize={{ scroll: false, debounce: { scroll: 0, resize: 140 } }}
+    gl={{ antialias: true, powerPreference: "high-performance", alpha: false, depth: true, stencil: false, preserveDrawingBuffer: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+    camera={{ position: [22, 7.8, 28], fov: props.mobile ? 50 : 39, near: 0.1, far: 120 }}
+    shadows="soft"
+    fallback={<div className="webgl-fallback" role="img" aria-label="Zeitgenössische Residenz in natürlicher Umgebung" />}
+    onCreated={({ gl }) => {
+      gl.outputColorSpace = THREE.SRGBColorSpace;
+      gl.shadowMap.type = THREE.PCFSoftShadowMap;
+      if (gl.getContext().isContextLost()) throw new Error("WebGL context unavailable during renderer initialization");
+      gl.domElement.addEventListener("webglcontextlost", (event) => {
+        event.preventDefault();
+        props.onContextLost();
+      }, false);
+      gl.domElement.addEventListener("webglcontextrestored", props.onContextRestored, false);
+      props.onRendererCreated();
+    }}
+  ><Scene {...props} /></Canvas>;
 }
-
-useGLTF.preload(`${MODEL_ROOT}villa.glb`);
-useGLTF.preload(`${MODEL_ROOT}quiver-tree.glb`);
-useGLTF.preload(`${MODEL_ROOT}shrub.glb`);
-useGLTF.preload(`${MODEL_ROOT}fern.glb`);

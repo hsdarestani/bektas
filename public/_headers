@@ -11,3 +11,12 @@
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+/experience/models/*
+  Cache-Control: public, max-age=604800
+
+/experience/textures/*
+  Cache-Control: public, max-age=604800
+
+/experience/environment/*
+  Cache-Control: public, max-age=604800
